@@ -1,0 +1,26 @@
+{
+  "name": "nursery-primary-result-portal",
+  "version": "1.0.0",
+  "description": "Nursery & Primary School Result Portal with PIN Checker, Admin Dashboard & Bulk Upload",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "express-session": "^1.17.3",
+    "get-intrinsic": "^1.2.4",
+    "multer": "^1.4.5-lts.1",
+    "node-sqlite3-wasm": "^0.8.31",
+    "readable-stream": "^4.7.0",
+    "safer-buffer": "^2.1.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+school_results.db
+school_results.db.lock
+uploads/
+*.log
+.env
