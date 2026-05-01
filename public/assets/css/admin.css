@@ -1236,3 +1236,56 @@ body {
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .stat-num { font-size: 1.4rem; }
 }
+
+/* ── Staff / Subject-Assignment UI ──────────────────────────────────────────── */
+
+.staff-subject-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 0.6rem;
+  background: #fafafa;
+}
+
+.staff-subject-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #374151;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.staff-subject-check:hover { background: #f0fdf4; }
+.staff-subject-check input { accent-color: #16a34a; cursor: pointer; }
+
+.staff-role-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 0.3rem;
+  text-transform: capitalize;
+}
+.staff-role-superadmin { background: #fef3c7; color: #92400e; }
+.staff-role-admin      { background: #f0fdf4; color: #166534; }
+.staff-role-staff      { background: #eff6ff; color: #1e40af; }
+
+.staff-subj-tag {
+  display: inline-block;
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 0.68rem;
+  margin: 1px 2px 1px 0;
+}

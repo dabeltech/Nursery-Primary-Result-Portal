@@ -124,6 +124,15 @@ db.exec(`
     FOREIGN KEY (student_id) REFERENCES students(id),
     UNIQUE(student_id, session, term, type, trait)
   );
+
+  CREATE TABLE IF NOT EXISTS subject_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER NOT NULL,
+    subject TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE,
+    UNIQUE(admin_id, subject)
+  );
 `);
 
 // Seed default admin

@@ -6,6 +6,7 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   await checkAuth();
+  await loadMe();
   await loadClassArms();
   await loadStats();
   await loadSettings();
@@ -135,16 +136,51 @@ async function loadStats() {
 let cachedStats    = null;
 let cachedSettings = {};
 let cachedClasses  = [];
+let cachedMe       = null;
+let allSubjects    = [];
+let editingAdminId = null;
+
+async function loadMe() {
+  try {
+    const res  = await fetch('/api/admin/me');
+    const data = await res.json();
+    if (!data.success) return;
+    cachedMe = data.admin;
+    const nameEl = document.getElementById('admin-name');
+    const roleEl = document.getElementById('admin-role');
+    const initEl = document.getElementById('user-initial');
+    if (nameEl) nameEl.textContent = cachedMe.full_name || cachedMe.username;
+    if (roleEl) roleEl.textContent = cachedMe.role === 'staff' ? 'Staff' : cachedMe.role === 'superadmin' ? 'Super Admin' : 'Admin';
+    if (initEl) initEl.textContent = (cachedMe.full_name || cachedMe.username).charAt(0).toUpperCase();
+    applyRoleUI();
+  } catch (_) {}
+}
+
+function applyRoleUI() {
+  if (!cachedMe || cachedMe.role !== 'staff') return;
+  ['upload','pins','tabulation','analysis','classview','settings'].forEach(sec => {
+    const el = document.querySelector(`.nav-item[data-section="${sec}"]`);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.qa-btn').forEach(btn => {
+    const onclick = btn.getAttribute('onclick') || '';
+    if (onclick.includes('upload') || onclick.includes('pins')) btn.style.display = 'none';
+  });
+}
 
 // ─── Class Arms ────────────────────────────────────────────────────────────────
 
 async function loadClassArms() {
   try {
-    const res  = await fetch('/api/admin/classes');
-    const data = await res.json();
-    if (!data.success) return;
-    cachedClasses = data.classes;
-    populateAllClassDropdowns();
+    const [classRes, subjRes] = await Promise.all([
+      fetch('/api/admin/classes'),
+      fetch('/api/admin/subjects')
+    ]);
+    const classData = await classRes.json();
+    const subjData  = await subjRes.json();
+    if (classData.success) { cachedClasses = classData.classes; populateAllClassDropdowns(); }
+    if (subjData.all)      allSubjects = subjData.all;
+    else if (subjData.subjects) allSubjects = subjData.subjects;
   } catch (_) {}
 }
 
@@ -617,13 +653,18 @@ async function selectStudentForResult(id, label, studentClass) {
 }
 
 async function loadSubjectsForClass(cls) {
-  const select  = document.getElementById('result-subject');
-  const hint    = document.getElementById('result-subject-hint');
+  const select = document.getElementById('result-subject');
+  const hint   = document.getElementById('result-subject-hint');
 
   try {
     const res  = await fetch('/api/admin/subjects?class=' + encodeURIComponent(cls || ''));
     const data = await res.json();
-    const subjects = data.subjects || [];
+    if (data.all && !allSubjects.length) allSubjects = data.all;
+    let subjects = data.subjects || [];
+
+    if (cachedMe && cachedMe.role === 'staff' && cachedMe.assignedSubjects && cachedMe.assignedSubjects.length) {
+      subjects = subjects.filter(s => cachedMe.assignedSubjects.includes(s));
+    }
 
     select.innerHTML = '<option value="">-- Select Subject --</option>';
     subjects.forEach(s => {
@@ -1039,21 +1080,101 @@ async function loadAdminsList() {
     const data = await res.json();
     if (!data.success) { el.innerHTML = '<p style="font-size:0.83rem;color:#64748b">Only super admins can view this.</p>'; return; }
     el.innerHTML = data.admins.map(a => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f0f0f0">
-        <div>
-          <strong style="font-size:0.85rem">${esc(a.full_name || a.username)}</strong>
-          <span style="color:#94a3b8;font-size:0.75rem;margin-left:0.5rem">@${esc(a.username)}</span>
-          <span style="background:#f0fdf4;color:#166534;padding:1px 6px;border-radius:4px;font-size:0.7rem;margin-left:0.3rem">${esc(a.role)}</span>
+      <div style="padding:0.55rem 0;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <strong style="font-size:0.85rem">${esc(a.full_name || a.username)}</strong>
+            <span style="color:#94a3b8;font-size:0.75rem;margin-left:0.5rem">@${esc(a.username)}</span>
+            <span class="staff-role-badge staff-role-${a.role}">${esc(a.role)}</span>
+          </div>
+          <div style="display:flex;gap:0.4rem">
+            ${a.role === 'staff' ? `<button class="btn-secondary btn-sm" onclick="openEditAssignmentsModal(${a.id},'${esc(a.full_name || a.username)}')">Subjects</button>` : ''}
+            <button class="btn-danger btn-sm" onclick="deleteAdmin(${a.id})">Del</button>
+          </div>
         </div>
-        <button class="btn-danger btn-sm" onclick="deleteAdmin(${a.id})">Del</button>
+        ${a.role === 'staff' && a.assignedSubjects && a.assignedSubjects.length
+          ? `<div style="margin-top:0.3rem;font-size:0.72rem;color:#64748b">${a.assignedSubjects.map(s => `<span class="staff-subj-tag">${esc(s)}</span>`).join('')}</div>`
+          : (a.role === 'staff' ? '<div style="margin-top:0.25rem;font-size:0.72rem;color:#ef4444">No subjects assigned yet</div>' : '')
+        }
       </div>
     `).join('');
   } catch (_) { el.innerHTML = '<p style="font-size:0.83rem;color:#64748b">Could not load admins.</p>'; }
 }
 
 function openAddAdminModal() {
-  document.getElementById('modal-add-admin').classList.add('open');
+  document.getElementById('new-admin-name').value     = '';
+  document.getElementById('new-admin-username').value = '';
+  document.getElementById('new-admin-password').value = '';
+  document.getElementById('new-admin-role').value     = 'admin';
   document.getElementById('add-admin-msg').style.display = 'none';
+  toggleStaffSubjects('admin');
+  document.getElementById('modal-add-admin').classList.add('open');
+}
+
+function toggleStaffSubjects(role) {
+  const wrap = document.getElementById('staff-subject-assign');
+  if (!wrap) return;
+  if (role === 'staff') {
+    wrap.style.display = 'block';
+    populateSubjectCheckboxes('staff-subject-checkboxes', []);
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function populateSubjectCheckboxes(containerId, selectedSubjects) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const list = allSubjects.length ? allSubjects : [];
+  container.innerHTML = list.map(s => `
+    <label class="staff-subject-check">
+      <input type="checkbox" value="${esc(s)}" ${selectedSubjects.includes(s) ? 'checked' : ''}>
+      <span>${esc(s)}</span>
+    </label>
+  `).join('');
+}
+
+function getCheckedSubjects(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return [];
+  return [...container.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
+}
+
+async function openEditAssignmentsModal(adminId, adminName) {
+  editingAdminId = adminId;
+  document.getElementById('edit-assign-name').textContent = `Staff: ${adminName}`;
+  document.getElementById('edit-assign-msg').style.display = 'none';
+  try {
+    const res  = await fetch(`/api/admin/staff-assignments/${adminId}`);
+    const data = await res.json();
+    populateSubjectCheckboxes('edit-subject-checkboxes', data.subjects || []);
+  } catch (_) {
+    populateSubjectCheckboxes('edit-subject-checkboxes', []);
+  }
+  document.getElementById('modal-edit-assignments').classList.add('open');
+}
+
+async function saveStaffAssignments() {
+  if (!editingAdminId) return;
+  const subjects = getCheckedSubjects('edit-subject-checkboxes');
+  const msgEl    = document.getElementById('edit-assign-msg');
+  try {
+    const res  = await fetch(`/api/admin/staff-assignments/${editingAdminId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subjects })
+    });
+    const data = await res.json();
+    msgEl.className   = data.success ? 'msg-success' : 'msg-error';
+    msgEl.textContent = data.message;
+    msgEl.style.display = 'block';
+    if (data.success) {
+      showToast('Subject assignments saved!', 'success');
+      setTimeout(() => { closeModal('modal-edit-assignments'); loadAdminsList(); editingAdminId = null; }, 700);
+    }
+  } catch (_) {
+    msgEl.className = 'msg-error'; msgEl.textContent = 'Error saving assignments.'; msgEl.style.display = 'block';
+  }
 }
 
 async function submitAddAdmin() {
@@ -1073,23 +1194,41 @@ async function submitAddAdmin() {
       body: JSON.stringify({ username, password, full_name: name, role })
     });
     const data = await res.json();
-    msgEl.className  = data.success ? 'msg-success' : 'msg-error';
-    msgEl.textContent = data.message;
-    msgEl.style.display = 'block';
-    if (data.success) {
-      showToast('Admin user created!', 'success');
+    if (data.success && role === 'staff') {
+      const subjects = getCheckedSubjects('staff-subject-checkboxes');
+      const staffRes = await fetch('/api/admin/admins');
+      const staffData = await staffRes.json();
+      if (staffData.success) {
+        const newStaff = staffData.admins.find(a => a.username === username.toLowerCase());
+        if (newStaff && subjects.length) {
+          await fetch(`/api/admin/staff-assignments/${newStaff.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subjects })
+          });
+        }
+      }
+      showToast('Staff account created with subject assignments!', 'success');
       setTimeout(() => { closeModal('modal-add-admin'); loadAdminsList(); }, 800);
+    } else {
+      msgEl.className  = data.success ? 'msg-success' : 'msg-error';
+      msgEl.textContent = data.message;
+      msgEl.style.display = 'block';
+      if (data.success) {
+        showToast('Admin user created!', 'success');
+        setTimeout(() => { closeModal('modal-add-admin'); loadAdminsList(); }, 800);
+      }
     }
   } catch (_) {
-    msgEl.className = 'msg-error'; msgEl.textContent = 'Error creating admin.'; msgEl.style.display = 'block';
+    msgEl.className = 'msg-error'; msgEl.textContent = 'Error creating account.'; msgEl.style.display = 'block';
   }
 }
 
 async function deleteAdmin(id) {
-  if (!confirm('Delete this admin user?')) return;
+  if (!confirm('Delete this admin/staff user?')) return;
   const res  = await fetch('/api/admin/admins/' + id, { method: 'DELETE' });
   const data = await res.json();
-  if (data.success) { showToast('Admin deleted.', 'success'); loadAdminsList(); }
+  if (data.success) { showToast('User deleted.', 'success'); loadAdminsList(); }
   else showToast(data.message, 'error');
 }
 

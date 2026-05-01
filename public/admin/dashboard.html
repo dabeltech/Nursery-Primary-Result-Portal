@@ -706,15 +706,37 @@
     </div>
     <div class="form-field-admin">
       <label>Role</label>
-      <select id="new-admin-role" class="admin-input">
-        <option value="admin">Admin</option>
+      <select id="new-admin-role" class="admin-input" onchange="toggleStaffSubjects(this.value)">
+        <option value="admin">Admin (Full Access)</option>
+        <option value="staff">Staff (Subject-Limited)</option>
         <option value="superadmin">Super Admin</option>
       </select>
+    </div>
+    <div id="staff-subject-assign" style="display:none">
+      <label style="font-size:0.82rem;font-weight:600;color:#374151;display:block;margin-bottom:0.4rem">Assigned Subjects</label>
+      <div id="staff-subject-checkboxes" class="staff-subject-grid"></div>
     </div>
     <div id="add-admin-msg" style="display:none;padding:0.6rem;border-radius:6px;font-size:0.85rem"></div>
     <div class="modal-footer">
       <button type="button" class="btn-secondary" onclick="closeModal('modal-add-admin')">Cancel</button>
-      <button type="button" class="btn-primary" onclick="submitAddAdmin()">Create Admin</button>
+      <button type="button" class="btn-primary" onclick="submitAddAdmin()">Create Staff / Admin</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Staff Assignments Modal -->
+<div class="modal-overlay" id="modal-edit-assignments">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Edit Subject Assignments</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit-assignments')">✕</button>
+    </div>
+    <p id="edit-assign-name" style="font-size:0.85rem;color:#64748b;margin-bottom:0.8rem"></p>
+    <div id="edit-subject-checkboxes" class="staff-subject-grid"></div>
+    <div id="edit-assign-msg" style="display:none;padding:0.6rem;border-radius:6px;font-size:0.85rem;margin-top:0.6rem"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-edit-assignments')">Cancel</button>
+      <button type="button" class="btn-primary" id="save-assign-btn" onclick="saveStaffAssignments()">Save Assignments</button>
     </div>
   </div>
 </div>

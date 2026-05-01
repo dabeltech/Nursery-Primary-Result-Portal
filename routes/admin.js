@@ -77,6 +77,18 @@ function getUniquePin() {
   return pin;
 }
 
+// ─── Current User ─────────────────────────────────────────────────────────────
+router.get('/me', requireAuth, (req, res) => {
+  const admin = db.prepare('SELECT id, username, full_name, role FROM admins WHERE id = ?').get(req.session.adminId);
+  if (!admin) return res.status(401).json({ success: false });
+  let assignedSubjects = [];
+  if (admin.role === 'staff') {
+    assignedSubjects = db.prepare('SELECT subject FROM subject_assignments WHERE admin_id = ?')
+      .all(req.session.adminId).map(r => r.subject);
+  }
+  res.json({ success: true, admin: { ...admin, assignedSubjects } });
+});
+
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 router.get('/stats', requireAuth, (req, res) => {
   const stats = {
@@ -171,6 +183,16 @@ router.post('/results', requireAuth, (req, res) => {
 
   if (!student_id || !subject || !session || !term) {
     return res.status(400).json({ success: false, message: 'Student, subject, session, and term are required.' });
+  }
+
+  // Staff can only upload results for their assigned subjects
+  if (req.session.adminRole === 'staff') {
+    const assigned = db.prepare(
+      'SELECT id FROM subject_assignments WHERE admin_id = ? AND subject = ?'
+    ).get(req.session.adminId, subject);
+    if (!assigned) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to upload results for this subject.' });
+    }
   }
 
   const ca1v = parseFloat(ca1) || 0;
@@ -494,7 +516,36 @@ router.get('/classes', requireAuth, (req, res) => {
 // ─── Subjects List ────────────────────────────────────────────────────────────
 router.get('/subjects', requireAuth, (req, res) => {
   const subjects = getSubjectsForClass(req.query.class);
+  res.json({ success: true, subjects, all: SUBJECTS });
+});
+
+// ─── Staff Subject Assignments ────────────────────────────────────────────────
+router.get('/staff-assignments/:adminId', requireAuth, (req, res) => {
+  const subjects = db.prepare('SELECT subject FROM subject_assignments WHERE admin_id = ?')
+    .all(req.params.adminId).map(r => r.subject);
   res.json({ success: true, subjects });
+});
+
+router.put('/staff-assignments/:adminId', requireAuth, (req, res) => {
+  if (req.session.adminRole !== 'superadmin' && req.session.adminRole !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Insufficient permissions.' });
+  }
+  const { subjects } = req.body;
+  const adminId = parseInt(req.params.adminId);
+  const admin = db.prepare('SELECT id FROM admins WHERE id = ?').get(adminId);
+  if (!admin) return res.status(404).json({ success: false, message: 'Staff member not found.' });
+  try {
+    db.transaction(() => {
+      db.prepare('DELETE FROM subject_assignments WHERE admin_id = ?').run(adminId);
+      if (Array.isArray(subjects) && subjects.length) {
+        const ins = db.prepare('INSERT OR IGNORE INTO subject_assignments (admin_id, subject) VALUES (?, ?)');
+        subjects.forEach(s => ins.run(adminId, s));
+      }
+    })();
+    res.json({ success: true, message: 'Subject assignments updated.' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Error updating assignments: ' + e.message });
+  }
 });
 
 // ─── Admin Management ─────────────────────────────────────────────────────────
@@ -503,6 +554,11 @@ router.get('/admins', requireAuth, (req, res) => {
     return res.status(403).json({ success: false, message: 'Insufficient permissions.' });
   }
   const admins = db.prepare('SELECT id, username, full_name, role, created_at FROM admins').all();
+  admins.forEach(a => {
+    a.assignedSubjects = a.role === 'staff'
+      ? db.prepare('SELECT subject FROM subject_assignments WHERE admin_id = ?').all(a.id).map(r => r.subject)
+      : [];
+  });
   res.json({ success: true, admins });
 });
 
