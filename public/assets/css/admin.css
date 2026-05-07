@@ -130,6 +130,18 @@ body {
   gap: 0.6rem;
 }
 
+.sidebar-powered {
+  text-align: center;
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.35);
+  padding: 0.4rem 1rem 0.7rem;
+  letter-spacing: 0.02em;
+}
+.sidebar-powered strong {
+  color: rgba(255,255,255,0.6);
+  font-weight: 600;
+}
+
 .user-avatar {
   width: 34px;
   height: 34px;

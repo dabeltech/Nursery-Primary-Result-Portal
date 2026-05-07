@@ -804,3 +804,15 @@ body {
   .school-name { font-size: 1rem; }
   .checker-brand { flex-direction: column; text-align: center; }
 }
+
+.site-footer {
+  text-align: center;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  padding: 1.2rem 0 1.8rem;
+  letter-spacing: 0.03em;
+}
+.site-footer strong {
+  color: #16a34a;
+  font-weight: 700;
+}
